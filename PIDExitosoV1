@@ -1,0 +1,87 @@
+#include <PID_v1_bc.h>
+#include <max6675.h>
+
+const int thermoDO = 12;
+const int thermoCS = 10;
+const int thermoCLK = 13;
+const int ssrPin = 9;
+
+MAX6675 thermocouple(thermoCLK, thermoCS, thermoDO);
+
+double setpoint = 70.0;
+double input = 0.0;
+double output = 0.0;
+
+double lastValidInput = 28.0;
+
+double kp = 2.0;
+double ki = 0.2;
+double kd = 0.5;
+
+PID myPID(&input, &output, &setpoint, kp, ki, kd, DIRECT);
+
+const unsigned long windowSize = 2000;
+unsigned long windowStartTime;
+unsigned long startTime;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(ssrPin, OUTPUT);
+
+  myPID.SetOutputLimits(0, windowSize);
+  myPID.SetMode(AUTOMATIC);
+  myPID.Initialize();
+
+  windowStartTime = millis();
+  startTime = millis();
+}
+
+void loop() {
+  double tempRaw = thermocouple.readCelsius();
+
+  // Filtro básico de lectura inválida
+  if (tempRaw > 500 || tempRaw < 0) {
+    input = lastValidInput; // mantén la última válida
+  } else {
+    input = tempRaw;
+    lastValidInput = input;
+  }
+
+  unsigned long now = millis();
+
+  // Espera 8 segundos antes de activar PID para estabilizar sensor
+  if (now - startTime < 8000) {
+    output = windowSize; // calentar a tope mientras tanto
+  } else {
+    double error = setpoint - input;
+
+    if (input < (setpoint - 10)) {
+      output = windowSize;  // calentar a tope si muy frío
+    } else if (abs(error) < 1.0 || input >= setpoint) {
+      output = 0;          // apagar si cerca o sobre setpoint
+    } else {
+      myPID.Compute();
+    }
+  }
+
+  if (now - windowStartTime > windowSize) {
+    windowStartTime += windowSize;
+  }
+
+  if ((now - windowStartTime) < output) {
+    digitalWrite(ssrPin, HIGH);
+  } else {
+    digitalWrite(ssrPin, LOW);
+  }
+
+  Serial.print("Temp: ");
+  Serial.print(input);
+  Serial.print(" | Setpoint: ");
+  Serial.print(setpoint);
+  Serial.print(" | Output(ms): ");
+  Serial.print(output);
+  Serial.print(" | Error: ");
+  Serial.println(setpoint - input);
+
+  delay(200);
+}
