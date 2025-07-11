@@ -1,0 +1,146 @@
+#include <PID_v1_bc.h>
+#include <max6675.h>
+
+const int thermoDO = 12;
+const int thermoCS = 10;
+const int thermoCLK = 13;
+const int ssrPin = 9;
+
+MAX6675 thermocouple(thermoCLK, thermoCS, thermoDO);
+
+// Variables
+double setpoint = 50.0;
+double input = 0.0;
+double output = 0.0;
+double lastValidInput = 28.0;
+
+// Parámetros PID
+double kp = 4.0, ki = 0.5, kd = 0.2;
+PID myPID(&input, &output, &setpoint, kp, ki, kd, DIRECT);
+
+// Filtro
+const int numReadings = 5;
+double readings[numReadings];
+int readIndex = 0;
+double total = 0.0;
+
+const unsigned long windowSize = 1000;
+unsigned long windowStartTime;
+
+enum Estado {
+  PRECALENTAMIENTO,
+  ENFRIANDO,
+  ESPERANDO_CONFIRMACION,
+  TUESTANDO,
+  ERROR_TERMOPAR  // Nuevo estado para errores
+};
+
+Estado estadoActual = PRECALENTAMIENTO;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(ssrPin, OUTPUT);
+  myPID.SetOutputLimits(0, windowSize);
+  myPID.SetMode(AUTOMATIC);
+  myPID.Initialize();
+  windowStartTime = millis();
+}
+
+bool leerTermopar(double &temperatura) {
+  double rawTemp = thermocouple.readCelsius();
+  
+  if (isnan(rawTemp) || rawTemp > 250 || rawTemp < -10) {
+    return false;  // Error detectado
+  }
+  
+  // Filtro de promedio móvil
+  total -= readings[readIndex];
+  readings[readIndex] = rawTemp;
+  total += readings[readIndex];
+  readIndex = (readIndex + 1) % numReadings;
+  
+  temperatura = total / numReadings;
+  return true;  // Lectura exitosa
+}
+
+void loop() {
+  double temp;
+  bool lecturaExitosa = leerTermopar(temp);
+
+  if (!lecturaExitosa) {
+    estadoActual = ERROR_TERMOPAR;  // Cambia a estado de error
+  } else {
+    input = temp;
+    lastValidInput = input;
+  }
+
+  unsigned long now = millis();
+
+  // Máquina de estados
+  switch (estadoActual) {
+    case PRECALENTAMIENTO:
+      setpoint = 120.0;
+      if (input < setpoint - 5) {
+        output = windowSize;
+      } else if (input >= setpoint) {
+        digitalWrite(ssrPin, LOW);
+        Serial.println("Precalentamiento listo. Esperando que enfrie...");
+        estadoActual = ENFRIANDO;
+      }
+      break;
+
+    case ENFRIANDO:
+      output = 0;
+      if (input <= 70.0) {
+        Serial.println("Temperatura de carga alcanzada. Envie 'T' para iniciar tueste.");
+        estadoActual = ESPERANDO_CONFIRMACION;
+      }
+      break;
+
+    case ESPERANDO_CONFIRMACION:
+      output = 0;
+      if (Serial.available()) {
+        char comando = Serial.read();
+        if (comando == 'T') {
+          setpoint = 130.0;
+          Serial.println("Iniciando tueste...");
+          estadoActual = TUESTANDO;
+          windowStartTime = millis();
+        }
+      }
+      break;
+
+    case TUESTANDO:
+      if (millis() - windowStartTime > 60000) setpoint = 140.0;
+      if (millis() - windowStartTime > 120000) setpoint = 150.0;
+      myPID.Compute();
+      break;
+
+    case ERROR_TERMOPAR:
+      digitalWrite(ssrPin, LOW);  // Apaga el foco por seguridad
+      Serial.println("ERROR: Termopar no responde. Revise conexiones y reinicie.");
+      while (true);  // Detiene el programa (o podrías agregar un reinicio)
+      break;
+  }
+
+  // Control PWM
+  if (now - windowStartTime > windowSize) {
+    windowStartTime += windowSize;
+  }
+  digitalWrite(ssrPin, (now - windowStartTime) < output ? HIGH : LOW);
+
+  // Monitor Serial (solo si no hay error)
+  if (estadoActual != ERROR_TERMOPAR) {
+    Serial.print("Temp: ");
+    Serial.print(input, 1);
+    Serial.print("°C | Estado: ");
+    Serial.print(estadoActual);
+    Serial.print(" | Setpoint: ");
+    Serial.print(setpoint, 1);
+    Serial.print("°C | Salida: ");
+    Serial.print(map(output, 0, windowSize, 0, 100));
+    Serial.println("%");
+  }
+
+  delay(200);
+}
