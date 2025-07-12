@@ -1,64 +1,93 @@
-""" #para termopar
-import time
-import board
-import digitalio
-import adafruit_max6675
 
-# Configuración SPI
-spi = board.SPI()  # Usa SPI por defecto: CLK=11, MISO=9, MOSI=10
-cs = digitalio.DigitalInOut(board.D8)  # Chip select (CS) en GPIO8
-
-# Crear el objeto del sensor
-sensor = adafruit_max6675.MAX6675(spi, cs)
-
-def termopar_lectura():
-    try:
-        while True:
-            temp_c = sensor.temperature
-            print(f"Temperatura: {temp_c:.2f} °C")
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("Lectura detenida.")
-
-    return temp_c """
-# termopar.py
-# import time
-# import random  # simula valores
-
-# temp_c = 0.0
-
-# def read_temp():
-    # global temp_c
-    # temp_c = random.uniform(20, 100)  # reemplaza con sensor.temperature
-    # return temp_c
-
-# def get_temp():
-    # return temp_c
 import time
 import serial  # Para leer del puerto serial
-
+import math
+import re
 # Puerto serial (ajústalo si es diferente)
-arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
+#arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
+arduino = serial.Serial('/dev/ttyACM1', 9600, timeout=1)
 time.sleep(2)
 
 # Variable para almacenar la temperatura
 temp_c = 0.0
 
 # Función para leer temperatura del puerto serial
+# ~ def read_temp():
+    # ~ global temp_c
+    # ~ if arduino.in_waiting > 0:
+        # ~ linea = arduino.readline().decode(errors='ignore').strip()
+        # ~ if linea.startswith("Temp:"):
+            # ~ try:
+                # ~ print(linea)
+                
+                # ~ temp_c = float(linea.replace("Temp:", "").strip())
+            # ~ except ValueError:
+                # ~ print("Error: No se pudo convertir la temperatura a float.")
+    # ~ return temp_c
+
+
+# def read_temp():
+    # global temp_c
+    # if arduino.in_waiting > 0:
+        # linea = arduino.readline().decode(errors='ignore').strip()
+        # print(f"Línea recibida: '{linea}'") 
+        # if linea.startswith("Temp: "):
+            # try:
+                # print(linea)
+                # valor_str = linea.replace("Temp: ", "").strip().replace("C", "")
+                # temp_leida = float(valor_str)
+                # print(temp_leida)
+
+                # # Validamos si el valor es numérico y no es NaN
+                # if math.isnan(temp_leida):
+                    # print("⚠️ Dato recibido es NaN. Se descarta.")
+                    # return None
+
+                # temp_c = temp_leida
+                # return temp_c
+
+            # except ValueError:
+                # print(" Error: No se pudo convertir la temperatura a float.")
+                # return None
+    # return None
+    
 def read_temp():
     global temp_c
     if arduino.in_waiting > 0:
-        linea = arduino.readline().decode().strip()
-        if linea.startswith("Temp:"):
-            temp_c = float(linea.replace("Temp: ", ""))
-    return temp_c
+        linea = arduino.readline().decode(errors='ignore').strip()
+        print(f"Línea recibida: '{linea}'")
+
+        match = re.search(r"Temp:\s*(-?\d+(\.\d+)?)°C", linea)
+        if match:
+            try:
+                temp_leida = float(match.group(1))  # solo el número antes del °C
+                print(f"Temperatura válida: {temp_leida}°C")
+
+                if math.isnan(temp_leida):
+                    print("⚠️ Es NaN, se descarta.")
+                    return None
+
+                temp_c = temp_leida
+                return temp_c
+
+            except ValueError:
+                print("❌ Error: No se pudo convertir el valor a float.")
+                return None
+        else:
+            print("⚠️ No se encontró temperatura en la línea.")
+    return None
 
 # Función para obtener el valor de la temperatura
 def get_temp():
     return temp_c
 
-# Bucle principal donde se lee la temperatura continuamente
-#while True:
- #   read_temp()  # Lee la temperatura desde el puerto serial
-  #  print(f"Temperatura: {get_temp()} °C")  # Muestra la temperatura
-   # time.sleep(1)  # Espera 1 segundo antes de leer nuevamente
+def iniciar_control():
+    if arduino.is_open:
+        arduino.write(b"START\n")    
+        print("enviado: START")
+
+def detener_control():
+    if arduino.is_open:
+        arduino.write(b"STOP\n")
+        print("enviado: STOP")
+

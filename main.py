@@ -14,9 +14,10 @@ import matplotlib.animation as animation
 import serial
 
 
-from imagenes import rutas_imagenes,ruta_imagen_espera
+from imagenes import rutas_imagenes, ruta_imagen_espera
 from balanza import start_reading, stop_reading, reset_scale, ingreso_cafe, get_current_reading
-#from lec_termopar import read_temp, get_temp
+from lec_termopar import read_temp, get_temp, iniciar_control, detener_control
+
 #from senzao import leer_serial
 """import RPi.GPIO as GPIO
 from hx711 import HX711  # Asegúrate de tener instalada esta librería
@@ -26,6 +27,8 @@ GPIO.setmode(GPIO.BCM)
 hx = HX711(dout_pin=2, pd_sck_pin=3)
 hx.zero()"""
 
+#arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
+arduino = serial.Serial('/dev/ttyACM1', 9600, timeout=1)
 
 # Variable para controlar el bucle de lectura
 running = False
@@ -42,6 +45,8 @@ def on_close():
     stop_reading()
     #GPIO.cleanup()
     root.destroy()
+
+#creación de funciones de arduino
 
 
 class SlidePanel(ttk.Frame):
@@ -157,31 +162,35 @@ class NotebookFrame(ttk.Notebook):
             read_temp()
             temperatura = get_temp()
             #leer_serial()
-            valorTemperatura.config(text=f"{temperatura:.2f} °C") #se imprime el valor de la temperatura
+            valorTemperatura.config(text="{temperaturas:} °C") #se imprime el valor de la temperatura
             tiempo_actual = time.time() - tiempo_inicio
             temperaturas.append(temperatura)
             tiempos.append(tiempo_actual)
 
             trayectoria.set_data(tiempos,temperaturas)
-            # Ajustar los límites del eje y (de 0 a 220 grados)
-            #ax3.set_ylim(0, 220)
-
-            # Ajustar los límites del eje x (de 0 a 10 minutos)
-            #ax3.set_xlim(0, 10)
-
             ax3.relim()
             ax3.autoscale_view()
             canvas3.draw()
-            tab3.after(10000, actualizar_temperatura)  # se actualiza cada 1 segundo, y va agregando los datos 
+            tab3.after(1000, actualizar_temperatura)  # se actualiza cada 1 segundo, y va agregando los datos 
 
 
         # Widget
         valorTemperatura = ttk.Label(master=tab3, text="-- °C", bootstyle='INFO')
         valorTemperatura.pack()
         configurar_graficaTemperatura(tab3)
-        #actualizar_temperatura() #se manda a llamar a la función que actualiza el valor de la temperatura
+        print(f"Temp leída: {temperaturas}")
+        actualizar_temperatura() #se manda a llamar a la función que actualiza el valor de la temperatura
         
-
+        
+# def leer_temperatura():
+    # if arduino.in_waiting > 0:
+        # linea = arduino.readline().decode().strip()
+        # if "Temp:" in linea:
+            # partes = linea.split("Temp:")[1].split("|")
+            # temp=partes[0].strip()
+            # level_temp.config(text=f"temperatura: {temp}°C")
+    # root.after(500,leer_temperatura)        
+    
 #TTK Boostrap
 root = ttk.Window(themename = 'lumen')
 
@@ -239,10 +248,10 @@ label_imagen_grande.pack(pady=10)
 
 frame_botones = tk.Frame(panelLateral) #contenedor con los modos de tueste
 
-btn_inicio = tk.Button(frame_botones, text="Inicio", font=("Arial", 14), height=5, width=10,borderwidth=0)
+btn_inicio = tk.Button(frame_botones, text="Inicio", command=iniciar_control, font=("Arial", 14), height=5, width=10,borderwidth=0)
 btn_inicio.pack(pady=10,padx=10, side=tk.LEFT,)
-
-btn_pausa = tk.Button(frame_botones, text="Pausa", font=("Arial", 14), height=5, width=10,borderwidth=0)
+            
+btn_pausa = tk.Button(frame_botones, text="Pausa", command=detener_control, font=("Arial", 14), height=5, width=10,borderwidth=0)
 btn_pausa.pack(pady=10,padx=10,side=tk.LEFT)
 
 #Tueste del frame
