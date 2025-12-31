@@ -15,6 +15,19 @@ def leer_serial():
             if linea.startswith("Temp:"):
                 temperatura = linea.replace("Temp: ", "")
                 temp_label.config(text=f"Temperatura: {temperatura} °C")
+                
+#FUNCION PARA ENVIAR A TRAVES DEL SERIAL 
+def send_command(self,cmd):
+    #8, A, B, TIEMPO DEL MOTOR
+    try:
+        packet = f"{cmd}\n"
+        arduino.write(packet.encode())
+        #print(f"comando enviado: {cmd}")
+    except Exception as e:
+        print("Error enviando comando:", e)
+        
+                        
+                
 # # GUI con Tkinter
 root = tk.Tk()
 root.title("Monitor de Temperatura")

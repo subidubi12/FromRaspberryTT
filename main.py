@@ -16,7 +16,8 @@ import serial
 
 from imagenes import rutas_imagenes, ruta_imagen_espera
 from balanza import start_reading, stop_reading, reset_scale, ingreso_cafe, get_current_reading
-from lec_termopar import read_temp, get_temp, iniciar_control, detener_control
+from lec_termopar import LectorTermopar
+#read_temp, get_temp, iniciar_control, detener_control, send_command
 
 #from senzao import leer_serial
 """import RPi.GPIO as GPIO
@@ -26,9 +27,12 @@ from hx711 import HX711  # Asegúrate de tener instalada esta librería
 GPIO.setmode(GPIO.BCM)
 hx = HX711(dout_pin=2, pd_sck_pin=3)
 hx.zero()"""
-
+#lector = LectorTermopar('/dev/ttyACM1', 9600)
+lector = LectorTermopar('/dev/serial/by-id/usb-Arduino__www.arduino.cc__0043_24238313635351910130-if00', 9600)
+lector.iniciar()
 #arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
-arduino = serial.Serial('/dev/ttyACM1', 9600, timeout=1)
+
+#arduino = serial.Serial('/dev/ttyACM1', 9600, timeout=1)
 
 # Variable para controlar el bucle de lectura
 running = False
@@ -159,12 +163,15 @@ class NotebookFrame(ttk.Notebook):
             canvas3.get_tk_widget().pack(fill=tk.BOTH, expand=0)
 
         def actualizar_temperatura(): #trae el valor de la temperatura
-            read_temp()
-            temperatura = get_temp()
+            #read_temp()
+            #temperatura = get_temp()
             #leer_serial()
-            valorTemperatura.config(text="{temperaturas:} °C") #se imprime el valor de la temperatura
+            temp = lector.get_temperatura()
+            print("UI ve temp:", temp)
+            if temp is not None:
+                valorTemperatura.config(text=f"{temp:.1f} °C") #se imprime el valor de la temperatura
             tiempo_actual = time.time() - tiempo_inicio
-            temperaturas.append(temperatura)
+            temperaturas.append(temp)
             tiempos.append(tiempo_actual)
 
             trayectoria.set_data(tiempos,temperaturas)
@@ -238,7 +245,14 @@ def actualizar_tueste(nombre):
     label_imagen_grande.image = imagenes_grandes[nombre]  # mantener referencia 
 
     print(nombre)
-
+def fun_peso_motor():
+    iniciar_control
+    send_command("8")
+    
+def apagarMotor():
+    detener_control
+    send_command("0")
+    
 #Etiqueta que cambia
 label_tueste = tk.Label(panelLateral, text="Selecciona un tueste", font=("Arial", 14), justify="left")
 label_tueste.pack(pady=10)
@@ -247,11 +261,11 @@ label_imagen_grande = tk.Label(panelLateral,bd=2,fg="gray",relief="groove")
 label_imagen_grande.pack(pady=10)
 
 frame_botones = tk.Frame(panelLateral) #contenedor con los modos de tueste
-
-btn_inicio = tk.Button(frame_botones, text="Inicio", command=iniciar_control, font=("Arial", 14), height=5, width=10,borderwidth=0)
+#BOTONES PRINCIPALES
+btn_inicio = tk.Button(frame_botones, text="Inicio", command=fun_peso_motor, font=("Arial", 14), height=5, width=10,borderwidth=0)
 btn_inicio.pack(pady=10,padx=10, side=tk.LEFT,)
             
-btn_pausa = tk.Button(frame_botones, text="Pausa", command=detener_control, font=("Arial", 14), height=5, width=10,borderwidth=0)
+btn_pausa = tk.Button(frame_botones, text="Pausa", command=apagarMotor, font=("Arial", 14), height=5, width=10,borderwidth=0)
 btn_pausa.pack(pady=10,padx=10,side=tk.LEFT)
 
 #Tueste del frame
@@ -281,3 +295,5 @@ ingresar_button.pack(side=ttk.BOTTOM, pady = 20)#grid(row=1, column=0, columnspa
 
 # Iniciar la aplicación
 root.mainloop()
+
+lector.detener()
