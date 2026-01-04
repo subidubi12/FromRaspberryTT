@@ -173,7 +173,14 @@ class NotebookFrame(ttk.Notebook):
             tiempo_actual = time.time() - tiempo_inicio
             temperaturas.append(temp)
             tiempos.append(tiempo_actual)
-
+            
+            tiempo_seg = lector.get_tiempo_restante() ##traemos el dato del tiempo
+            if tiempo_seg is not None:
+                m = tiempo_seg // 60
+                s = tiempo_seg % 60
+                label_tiempo.config(text=f"{m}m {s}s")
+            else:
+                label_tiempo.config(text="--")
             trayectoria.set_data(tiempos,temperaturas)
             ax3.relim()
             ax3.autoscale_view()
@@ -184,6 +191,8 @@ class NotebookFrame(ttk.Notebook):
         # Widget
         valorTemperatura = ttk.Label(master=tab3, text="-- °C", bootstyle='INFO')
         valorTemperatura.pack()
+        label_tiempo = ttk.Label(master=tab3, text="xx °C", bootstyle='INFO')
+        label_tiempo.pack()
         configurar_graficaTemperatura(tab3)
         print(f"Temp leída: {temperaturas}")
         actualizar_temperatura() #se manda a llamar a la función que actualiza el valor de la temperatura
@@ -243,15 +252,30 @@ def actualizar_tueste(nombre):
 
     label_imagen_grande.config(image=imagenes_grandes[nombre])
     label_imagen_grande.image = imagenes_grandes[nombre]  # mantener referencia 
-
+    
     print(nombre)
+    if nombre == "TUESTE CLARO":
+        lector.send_command("OCHO_MIN")
+        print("ocho MIN")
+    elif nombre == "TUESTE MEDIO":
+        lector.send_command("DIEZ_MIN")
+        print("diez MIN")
+    elif nombre == "TUESTE OBSCURO":
+        lector.send_command("DOCE_MIN")
+        print("doce MIN")
+    elif nombre == "TUESTE ARTESANAL":
+        lector.send_command("OCHO_MIN")
+        print("ocho MIN")
+
+
+
 def fun_peso_motor():
     iniciar_control
-    send_command("8")
+    lector.send_command("START")
     
 def apagarMotor():
     detener_control
-    send_command("0")
+    lector.send_command("RESET")
     
 #Etiqueta que cambia
 label_tueste = tk.Label(panelLateral, text="Selecciona un tueste", font=("Arial", 14), justify="left")

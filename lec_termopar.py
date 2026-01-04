@@ -9,6 +9,7 @@ class LectorTermopar:
     def __init__(self, puerto='/dev/serial/by-id/usb-Arduino__www.arduino.cc__0043_24238313635351910130-if00', baud=9600):
         self.arduino = serial.Serial(puerto,baud,timeout=1)
         self._temp = None
+        self._tiempo_restante = None
         self._etiquetaTiempo = None
         self._estado = None
         self._setpoint = None
@@ -35,19 +36,29 @@ class LectorTermopar:
             print("RAW:", repr(linea))
             if not linea.startswith("Temp:"):
                 continue
-            match = re.search(r"Temp:\s*(-?\d+(?:\.\d+)?)", linea)
-            matchTiempo = re.search(r"Tiempo Restante:\s*(\d+)m?\s*(\d+)s", linea)
-            if not match #|| matchTiempo: #se agrego || matchTirempo
+            match_temperatura = re.search(r"Temp:\s*(-?\d+(?:\.\d+)?)", linea)
+            match_tiempo = re.search(r"Tiempo Restante:\s*(\d+)m\s*(\d+)s", linea)
+            if not match_temperatura: 
                 continue
             
-            temp = float(match.group(1))
+            temp = float(match_temperatura.group(1))
             
+            if match_tiempo:
+                minutos = int(match_tiempo.group(1))
+                segundos = int(match_tiempo.group(2))
+                tiempo_seg = minutos * 60 + segundos
+                
             with self._lock:
                 self._temp = temp
-        
+                self._tiempo_restante = tiempo_seg
+                    
     def get_temperatura(self):
         with self._lock:
             return self._temp #ag etiqueta tiempo en declaracion y return
+    
+    def get_tiempo_restante(self):
+        with self._lock:
+            return self._tiempo_restante
     ####        MOTOR       ####
     def iniciar_control():
         
@@ -60,7 +71,7 @@ class LectorTermopar:
             arduino.write(b"STOP\n")
             print("enviado: STOP")
         
-    def send_command(cmd):
+    def send_command(self, cmd):
         #8, A, B, TIEMPO DEL MOTOR
         try:
             packet = f"{cmd}\n"
