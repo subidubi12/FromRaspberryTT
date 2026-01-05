@@ -197,16 +197,7 @@ class NotebookFrame(ttk.Notebook):
         print(f"Temp leída: {temperaturas}")
         actualizar_temperatura() #se manda a llamar a la función que actualiza el valor de la temperatura
         
-        
-# def leer_temperatura():
-    # if arduino.in_waiting > 0:
-        # linea = arduino.readline().decode().strip()
-        # if "Temp:" in linea:
-            # partes = linea.split("Temp:")[1].split("|")
-            # temp=partes[0].strip()
-            # level_temp.config(text=f"temperatura: {temp}°C")
-    # root.after(500,leer_temperatura)        
-    
+
 #TTK Boostrap
 root = ttk.Window(themename = 'lumen')
 
@@ -270,11 +261,11 @@ def actualizar_tueste(nombre):
 
 
 def fun_peso_motor():
-    iniciar_control
+    #iniciar_control
     lector.send_command("START")
     
 def apagarMotor():
-    detener_control
+    #detener_control
     lector.send_command("RESET")
     
 #Etiqueta que cambia
